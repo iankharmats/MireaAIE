@@ -79,6 +79,12 @@ uv run eda-cli report data/test_custom_heuristics.csv --out-dir reports_example 
 - `missing_matrix.png` – визуализация пропусков;
 - `correlation_heatmap.png` – тепловая карта корреляций.
 
+## Запуск Web-приложения
+```bash
+uv run uvicorn eda_cli.api:app --reload --port 8000
+```
+Команда запускает FastAPI приложение app из файла eda_cli/api.py на порту 8000 с автоперезагрузкой.
+
 ## API - запросы
 
 ### SYSTEM
