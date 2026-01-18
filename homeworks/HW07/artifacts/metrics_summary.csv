@@ -1,0 +1,7 @@
+name,n_clusters,noise_points,noise_ratio,silhouette,davies_bouldin,calinski_harabasz
+dataset-01_kmeans,2,0,0.0000,0.5220,0.6850,11786.9550
+dataset-02_kmeans,2,0,0.0000,0.3070,1.3230,3573.3930
+dataset-03_kmeans,3,0,0.0000,0.3160,1.1580,6957.1630
+dataset-04_kmeans,5,0,0.0000,0.4550,0.9520,5323.5000
+dataset-01_dbscan,2,0,0.0000,0.5220,0.6850,11786.9550
+dataset-04_dbscan,6,3231,0.3230,0.4830,0.8840,4802.6410

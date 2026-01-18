@@ -1,0 +1,46 @@
+{
+    "criterion": "silhouette, pca2D_interpretation",
+    "dataset-01_kmeans": {
+        "algorithm": "lloyd",
+        "copy_x": true,
+        "init": "k-means++",
+        "max_iter": 300,
+        "n_clusters": 2,
+        "n_init": 10,
+        "random_state": 42,
+        "tol": 0.0001,
+        "verbose": 0
+    },
+    "dataset-02_dbscan": {
+        "algorithm": "auto",
+        "eps": 1.4739473684210527,
+        "leaf_size": 30,
+        "metric": "euclidean",
+        "metric_params": null,
+        "min_samples": 15,
+        "n_jobs": null,
+        "p": null
+    },
+    "dataset-03_kmeans": {
+        "algorithm": "lloyd",
+        "copy_x": true,
+        "init": "k-means++",
+        "max_iter": 300,
+        "n_clusters": 3,
+        "n_init": 10,
+        "random_state": 42,
+        "tol": 0.0001,
+        "verbose": 0
+    },
+    "dataset-04_kmeans": {
+        "algorithm": "lloyd",
+        "copy_x": true,
+        "init": "k-means++",
+        "max_iter": 300,
+        "n_clusters": 5,
+        "n_init": 10,
+        "random_state": 42,
+        "tol": 0.0001,
+        "verbose": 0
+    }
+}
