@@ -1,0 +1,22 @@
+{
+    "seed": 42,
+    "dataset": "CIFAR-10",
+    "architecture": {
+        "type": "BatchNorm",
+        "hidden_layers": [
+            512,
+            256,
+            64
+        ],
+        "dropout": null
+    },
+    "training": {
+        "optimizer": "Adam",
+        "batch_size": 64,
+        "early_stopping_patience": 4
+    },
+    "results": {
+        "best_val_accuracy": 0.5536,
+        "test_accuracy": 0.5433
+    }
+}
