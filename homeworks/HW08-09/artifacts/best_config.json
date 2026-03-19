@@ -2,18 +2,23 @@
     "seed": 42,
     "dataset": "CIFAR-10",
     "architecture": {
-        "type": "BatchNorm",
+        "parent": "E3",
         "hidden_layers": [
             512,
             256,
             64
         ],
+        "activation": "ReLU",
+        "batchnorm": true,
         "dropout": null
     },
     "training": {
         "optimizer": "Adam",
         "batch_size": 64,
-        "early_stopping_patience": 4
+        "learning_rate": 0.001,
+        "early_stopping_patience": 4,
+        "momentum": 0.0,
+        "weight_decay": 0.0
     },
     "results": {
         "best_val_accuracy": 0.5536,

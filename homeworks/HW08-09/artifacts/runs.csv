@@ -1,8 +1,8 @@
-experiment_id,dataset,seed,model_summary,optimizer,lr,momentum,weight_decay,epochs_trained,best_val_accuracy,best_val_loss
-E1,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, no dropout, no batchnorm",Adam,0.001,0.0,0.0,15,0.5391,1.3744
-E2,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, dropout (p=0.3), no batchnorm",Adam,0.001,0.0,0.0,15,0.5306,1.3538
-E3,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm",Adam,0.001,0.0,0.0,15,0.5554,1.2993
-E4,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm",Adam,0.001,0.0,0.0,30,0.5536,1.2906
-O1,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm",Adam,0.1,0.0,0.0,15,0.5294,1.4059
-O2,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm",Adam,1e-05,0.0,0.0,15,0.5302,1.383
-O3,CIFAR10,42,"MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm",SGD,0.01,0.9,0.0001,15,0.5594,1.2984
+experiment_id, dataset, seed, model_summary                                                  , optimizer, lr   , momentum, weight_decay, epochs_trained, best_val_accuracy, best_val_loss
+E1           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, no dropout, no batchnorm"     , Adam     , 0.001,      0.0,       0.0   ,             15,            0.5391,        1.3744
+E2           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, dropout (p=0.3), no batchnorm", Adam     , 0.001,      0.0,       0.0   ,             15,            0.5306,        1.3538
+E3           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm"        , Adam     , 0.001,      0.0,       0.0   ,             15,            0.5554,        1.2993
+E4           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm"        , Adam     , 0.001,      0.0,       0.0   ,             30,            0.5536,        1.2906
+O1           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm"        , Adam     , 0.1  ,      0.0,       0.0   ,             15,            0.5294,        1.4059
+O2           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm"        , Adam     , 1e-05,      0.0,       0.0   ,             15,            0.5302,        1.383
+O3           , CIFAR10,   42, "MLP, hidden=[512,256,64], ReLU, no dropout, batchnorm"        , SGD      , 0.01 ,      0.9,       0.0001,             15,            0.5594,        1.2984
