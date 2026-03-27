@@ -1,0 +1,5 @@
+experiment_id,task,dataset,seed,split_summary,window_size,horizon,model_summary,features_summary,scaler,optimizer,lr,epochs_trained,best_val_mae,best_val_rmse,best_val_mape,test_mae,test_rmse,test_mape,notes
+B1,forecasting,hourly_target,42,70/15/15,24,1,naive_last,none,StandardScaler,,,0,641.1914619584735,715.9419144093148,19.42485149821507,,,,baseline: прогноз = последнее значение из train
+B2,forecasting,hourly_target,42,70/15/15,24,1,moving_average_window24,rolling_mean_24,StandardScaler,,,0,393.6448455305414,473.0260131405302,11.869465637376205,,,,baseline: среднее за последние 24 часа
+B3,forecasting,hourly_target,42,70/15/15,24,1,Ridge_regression,"lag1,lag7,lag14,mean7,std7,mean14,std14,trend",StandardScaler,,,0,106.83300220995159,136.99628562109308,3.401862966453348,111.29217596072604,141.3134518518243,3.5251965931404707,линейная модель на лаговых и статистических признаках
+R1,forecasting,hourly_target,42,70/15/15,24,1,GRU_2layers_64hidden,window_24_raw,StandardScaler,Adam,0.001,50,476.29577871042846,,,,,,"GRU, hidden=64, layers=2"
