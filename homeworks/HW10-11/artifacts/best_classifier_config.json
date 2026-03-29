@@ -1,29 +1,22 @@
 {
+  "seed": 42,
   "best_model": "C4",
-  "dataset": {
-    "name": "STL10",
-    "classes": 10,
-    "split": {
-      "train": 10400,
-      "val": 1300,
-      "test": 1300
-    },
-    "seed": 42
-  },
-  "model": {
-    "architecture": "ResNet18Finetune",
-    "pretrained": true,
-    "trainable_layers": "layer4+fc"
-  },
+  "dataset": "STL10",
+  "classes": 10,
+  "train": 10400,
+  "val": 1300,
+  "test": 1300,
+  "architecture": "ResNet18Finetune",
+  "input_size": 128,
+  "pretrained": true,
+  "trainable_layers": "layer4+fc",
   "transforms": "basic",
-  "training": {
-    "batch_size": 16,
-    "epochs": 15,
-    "optimizer": "Adam",
-    "loss": "CrossEntropyLoss"
-  },
-  "results": {
-    "best_val_acc": 0.93,
-    "test_acc": 0.9423076923076923
-  }
+  "batch_size": 16,
+  "epochs": 15,
+  "optimizer": "Adam",
+  "lr": 0.001,
+  "augmentations": false,
+  "loss": "CrossEntropyLoss",
+  "best_val_acc": 0.93,
+  "test_acc": 0.9423076923076923
 }
