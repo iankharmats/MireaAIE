@@ -6,7 +6,7 @@
   "batch_size": 32,
   "learning_rate": 0.001,
   "seed": 42,
-  "scaler_mean": 130.9954067402673,
-  "scaler_scale": 19.707359990423505,
-  "best_val_mae": 476.29577871042846
+  "scaler_mean": 128.2521495016611,
+  "scaler_scale": 18.49701999697105,
+  "best_val_mae": 296.8387785517682
 }
