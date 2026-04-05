@@ -1,0 +1,6 @@
+text,true_label,predicted_label,confidence
+i don t feel particularly agitated,fear,LABEL_3,0.6701349020004272
+i feel beautifully emotional knowing that these women of whom i knew just a handful were holding me and my baba on our journey,sadness,LABEL_0,0.9987285733222961
+i pay attention it deepens into a feeling of being invaded and helpless,fear,LABEL_4,0.9299129247665405
+i just feel extremely comfortable with the group of people that i dont even need to hide myself,joy,LABEL_1,0.9987674951553345
+i find myself in the odd position of feeling supportive of,love,LABEL_2,0.9942983984947205
