@@ -1,4 +1,4 @@
-text,true_label,predicted_label,confidence
+text,true_label,pred_label,confidence
 i don t feel particularly agitated,fear,anger,0.67
 i feel beautifully emotional knowing that these women of whom i knew just a handful were holding me and my baba on our journey,sadness,sadness,0.999
 i pay attention it deepens into a feeling of being invaded and helpless,fear,fear,0.93
