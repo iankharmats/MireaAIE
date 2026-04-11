@@ -1,0 +1,8 @@
+{
+  "total_queries": 8,
+  "k": 3,
+  "hit_at_k": 1.0,
+  "recall_at_k": 0.9375,
+  "successful_queries": 8,
+  "failed_queries": 0
+}
