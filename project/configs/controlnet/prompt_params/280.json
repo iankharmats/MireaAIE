@@ -1,0 +1,8 @@
+{
+    "control_weight": 0.8,
+    "starting_control_step": 0.0,
+    "ending_control_step": 0.8,
+    "feature_map_dir": "/home/ian/Desktop/ptn/mirea/aie/project/configs/controlnet/feature_maps/280.png",
+    "text_promt": "A hyper-realistic studio photograph of a caricatured cheerful, expressive look human, highly detailed skin texture, visible pores, individual hair strands, expressive eyes with realistic reflections, professional cinematic lighting, shot on 85mm lens, f/1.8, dramatic rim light, dark studio background, photorealistic masterpiece",
+    "negative_promt": "normal proportions, regular anatomy, symmetrical face, 3D render, anime, cartoon, illustration, drawing, painting, bad anatomy, smooth skin, plastic skin, blurry, low resolution, watermark"
+}
