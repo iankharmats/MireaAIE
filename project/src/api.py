@@ -15,12 +15,17 @@ import os
 
 from .feature_extraction import warp_image
 from caricature_generator import CaricatureGenerator
+from caricature_metrics import evaluate
 
 # --------------- Поля сбора статистики --------------
 total_req = 0
 latency_ct = 0
 total_latency_ms = 0
-last_ok_for_model = {"score": 0.0, "time": None}
+last_caricature_metrics = {
+    "timestamp": None,
+    "request_id": None,
+    "metrics": None
+}
 
 # --------------- FastAPI ---------------
 
@@ -89,7 +94,7 @@ class RequestLogger:
         json_str = f'{json.dumps(log_entry, ensure_ascii=False)}\n'
         print(json_str)
 
-        with open(os.path.join(LOG_DIR, LOG_FILENAME), 'a', encoding='utf-8') as f:
+        with open(full_log_path, 'a', encoding='utf-8') as f:
             f.write(json_str)
 
 
@@ -106,17 +111,22 @@ def health() -> dict[str, str]:
     }
 
 
-@app.get("/metrics", tags=["system"], summary="Статистика по работе сервиса.")
+@app.get("/metrics", tags=["system"], summary="Статистика по работе сервера и метрики последнего шаржа.")
 def metrics() -> dict[str, Any]:
+    global total_latency_ms, latency_ct, total_req, last_caricature_metrics
     try: 
-        global total_latency_ms, latency_ct
         avg_latency_ms = total_latency_ms / latency_ct
-    except:
+    except ZeroDivisionError:
         avg_latency_ms = None
-    global total_req
+        
     return {
         "total_req": total_req,
         "avg_latency_ms": avg_latency_ms,
+        "last_caricature_evaluation": {
+            "timestamp": last_caricature_metrics["timestamp"],
+            "request_id": last_caricature_metrics["request_id"],
+            "data": last_caricature_metrics["metrics"]
+        }
     }
 
 
@@ -158,7 +168,8 @@ async def caricature_generation(
 ):
     """
     Эндпоинт принимает фото, сохраняет его во временный файл, передает в пайплайн 
-    ControlNet+SD 1.5, прогоняет через критика Qwen2-VL и возвращает лучшую карикатуру.
+    ControlNet+SD 1.5, прогоняет через критика Qwen2-VL, рассчитывает технические 
+    метрики сходства/качества и возвращает лучшую карикатуру.
     """
     global total_req
     total_req += 1
@@ -171,6 +182,7 @@ async def caricature_generation(
         raise HTTPException(status_code=400, detail="Загруженный файл не является изображением.")
 
     temp_input_path = f"temp_gen_{request_id}.jpg"
+    temp_output_path = f"temp_out_{request_id}.png"
     
     try:
         # Сохраняем входящий поток байт во временный файл для генератора
@@ -185,8 +197,29 @@ async def caricature_generation(
         
         best_img = result["best"]
         
-        io_buf = io.BytesIO()
-        best_img.save(io_buf, format="PNG")
+        # Сохраняем во временный файл на диске, чтобы скормить модулю caricature_metrics
+        best_img.save(temp_output_path, format="PNG")
+        
+        # Считаем CLIP и Artifacts для конкретного кадра на доступной GPU (например, cuda:3)
+        metrics_score = evaluate(
+            original=temp_input_path,
+            caricature=temp_output_path,
+            device="cuda:3",
+            compute_fid=False,       # Отключаем FID для поштучного инференса
+            compute_kid=False,       # Отключаем KID для поштучного инференса
+            compute_clip=True,
+            compute_artifacts=True
+        )
+        
+        # Обновляем глобальное состояние для эндпоинта /metrics
+        global last_caricature_metrics
+        last_caricature_metrics["timestamp"] = datetime.now().isoformat()
+        last_caricature_metrics["request_id"] = request_id
+        last_caricature_metrics["metrics"] = metrics_score
+        
+        # Переводим сохраненную картинку обратно в IO буфер для StreamingResponse
+        with open(temp_output_path, "rb") as img_f:
+            io_buf = io.BytesIO(img_f.read())
         io_buf.seek(0)
         
         status_code = 200
@@ -197,9 +230,10 @@ async def caricature_generation(
         raise HTTPException(status_code=500, detail=f"Ошибка пайплайна генерации: {str(e)}")
         
     finally:
-        # Блок гарантированно удалит временный файл с диска даже при критическом сбое
         if os.path.exists(temp_input_path):
             os.remove(temp_input_path)
+        if os.path.exists(temp_output_path):
+            os.remove(temp_output_path)
 
     global total_latency_ms, latency_ct
     latency_ms = (perf_counter() - start) * 1000.0
@@ -219,15 +253,14 @@ async def caricature_generation(
 @app.post(
     "/warp", tags=["main"], summary="Warp-деформация загруженного изображения.",
     response_class=StreamingResponse, 
-    # Переопределяем отображение схемы в Swagger UI
     responses={
         200: {
             "description": "Успешное выполнение варпинга. Возвращает измененный PNG-файл.",
             "content": {
-                "image/png": {  # Это переключит Media type с application/json
+                "image/png": {  
                     "schema": {
                         "type": "string",
-                        "format": "binary"  # Это уберет "string" из Example Value
+                        "format": "binary"  
                     }
                 }
             }
@@ -249,33 +282,25 @@ async def warp(
         description="Сила утрирования черт"
     )
 ) -> Response:
-    """
-    Эндпоинт принимает файл изображения и коэффициент деформации через форму,
-    выполняет варпинг лица и возвращает бинарный файл измененного изображения (PNG).
-    """
     global total_req
     total_req += 1
     request_id = str(uuid.uuid4())
 
     start = perf_counter()
 
-    # Проверяем, что загружен именно графический файл
     if not file.content_type.startswith("image/"):
         RequestLogger.log_request(endpoint="/warp", status=400, request_id=request_id)
         raise HTTPException(status_code=400, detail="Загруженный файл не является изображением.")
 
     temp_input_path = f"temp_input_{request_id}.jpg"
     try:
-        # Читаем бинарный контент загруженного файла
         contents = await file.read()
         
-        # Создаем временный файл, чтобы скормить его в mediapipe_prompt_extraction
         with open(temp_input_path, "wb") as f:
             f.write(contents)
             
         warped_img_bgr = warp_image(temp_input_path, strength)
         
-        # Удаляем временный файл с диска после обработки
         if os.path.exists(temp_input_path):
             os.remove(temp_input_path)
             
