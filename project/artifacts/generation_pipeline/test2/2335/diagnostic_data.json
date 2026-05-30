@@ -1,0 +1,22 @@
+{
+  "image": "2335.jpg",
+  "image_size_wh": [
+    682,
+    1024
+  ],
+  "n_landmarks": 478,
+  "landmarks_range_x": [
+    157,
+    550
+  ],
+  "landmarks_range_y": [
+    197,
+    668
+  ],
+  "eye_distance_px": 246.3980519403512,
+  "max_exaggeration": 0.5502707546954747,
+  "max_offset_px": 135.58564199671181,
+  "mean_offset_px": 16.990849235606863,
+  "warp_pixel_diff": 20.194530199932796,
+  "strength": 1.5
+}

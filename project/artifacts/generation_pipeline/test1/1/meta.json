@@ -1,0 +1,12 @@
+{
+  "image": "1.jpg",
+  "strength": 2.1,
+  "seed_A": 67,
+  "seed_B": 999,
+  "denoise": 0.85,
+  "guidance": 9.0,
+  "ip_adapter": 0.35,
+  "controlnet_w": 0.6,
+  "positive_prompt": "exaggerated caricature portrait, bold dramatic exaggeration of facial features, expressive, humorous distortion, professional caricature artist, strong shadows, masterpiece, extremely razor thin lips, pencil thin eyebrows",
+  "negative_prompt": "photorealistic, photograph, normal proportions, regular anatomy, symmetrical face, subtle, realistic, 3D render, anime, bad anatomy, blurry, watermark"
+}

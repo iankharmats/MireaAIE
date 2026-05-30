@@ -28,7 +28,6 @@ class MediaPipeFaceAggregator:
     
     def __init__(self, model_path: str = "artifacts/pretrained_models/face_landmarker.task",  mean_face_path: Optional[str] = None):
         # Скачиваем модель если её нет
-        model_path = get_dir_from_root(model_path)
         if not os.path.exists(model_path):
             self._download_model(model_path)
         
@@ -388,9 +387,6 @@ class MediaPipeFaceAggregator:
 
 # Вспомогательные функции
 
-def get_dir_from_root(path: str) -> str: 
-    return os.path.join(os.path.abspath(".."), path)
-
 def get_canonical_groups():
     """
     Генерирует группы на основе официальных констант MediaPipe Face Mesh.
@@ -548,11 +544,11 @@ def generate_dynamic_caricature_prompt(deviations: Dict[str, Dict],
     return final_prompt
 
 def mediapipe_prompt_extraction(image_path: str, exageration_strength: int = 1.5):
-
+    """Ключевая функция модуля - составление карты признаков и промта для ControlNet"""
     image = cv2.imread(image_path)
 
     # Передаем ссылку на JSON-файл при создании объекта
-    p = get_dir_from_root("configs/mean_face.json")
+    p = "configs/mean_face.json"
     if os.path.exists(p):
         aggregator = MediaPipeFaceAggregator(mean_face_path=p)
     else:
@@ -569,7 +565,7 @@ def mediapipe_prompt_extraction(image_path: str, exageration_strength: int = 1.5
     warped_bgr = cv2.cvtColor(warped_img, cv2.COLOR_RGB2BGR)
     name = image_path.split('.')[0].split('/')[-1]
 
-    save_path = get_dir_from_root(f'configs/controlnet/feature_maps/{name}.png')
+    save_path = f'configs/controlnet/feature_maps/{name}.png'
     cv2.imwrite(save_path, warped_bgr)
 
     controlnet_input = {
@@ -582,7 +578,27 @@ def mediapipe_prompt_extraction(image_path: str, exageration_strength: int = 1.5
     }
 
     # Сохраняем
-    with open(get_dir_from_root(f'configs/controlnet/prompt_params/{name}.json'), 'w') as f:
+    with open(f'configs/controlnet/prompt_params/{name}.json', 'w') as f:
         json.dump(controlnet_input, f, indent=4)
     
     return controlnet_input
+
+def warp_image(image_path: str, exageration_strength: int = 1.5):
+    """Функция для визуализации варпа на веб-сервисе"""
+    image = cv2.imread(image_path)
+
+    # Передаем ссылку на JSON-файл при создании объекта
+    p = "configs/mean_face.json"
+    if os.path.exists(p):
+        aggregator = MediaPipeFaceAggregator(mean_face_path=p)
+    else:
+        import inspect
+        frame = inspect.currentframe()
+        caller_dir = os.path.dirname(os.path.abspath(inspect.getfile(frame)))
+        raise FileNotFoundError(f'Не найден файл configs/mean_face.json. Тек. директория: {os.getcwd()}. Директория файла, откуда вызвана функция: {caller_dir}')
+    groups = get_canonical_groups()
+    params = get_caricature_parameters(aggregator, groups, image_path, strength=exageration_strength)
+    warped_img = aggregator.warp_face(image_path, caricature_params=params, target_size=image.shape[:-1])
+
+    warped_bgr = cv2.cvtColor(warped_img, cv2.COLOR_RGB2BGR)
+    return warped_bgr
