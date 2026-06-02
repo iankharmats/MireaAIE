@@ -14,8 +14,8 @@ import json
 import os
 
 from .feature_extraction import warp_image
-from caricature_generator import CaricatureGenerator
-from caricature_metrics import evaluate
+from .caricature_generator import CaricatureGenerator
+from .metrics import evaluate
 
 # --------------- Поля сбора статистики --------------
 total_req = 0
@@ -50,7 +50,7 @@ print("⏳ Загрузка весов SD 1.5, ControlNet и Qwen2-VL в вид�
 generator = CaricatureGenerator(
     checkpoint_dir = os.path.join(PROJECT_ROOT, "notebooks/dpo_checkpoints/cycle_01"),
     mean_face_path = MEAN_FACE_PATH,
-    judge_device   = "cuda:3",  # Судья на отдельной карте
+    judge_device   = "cuda",  # Судья на отдельной карте
 )
 print("🚀 Все модели успешно загружены и готовы к инференсу!")
 
@@ -204,7 +204,7 @@ async def caricature_generation(
         metrics_score = evaluate(
             original=temp_input_path,
             caricature=temp_output_path,
-            device="cuda:3",
+            device="cuda",
             compute_fid=False,       # Отключаем FID для поштучного инференса
             compute_kid=False,       # Отключаем KID для поштучного инференса
             compute_clip=True,

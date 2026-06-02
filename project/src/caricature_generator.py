@@ -22,7 +22,7 @@ from PIL import Image
 warnings.filterwarnings("ignore")
 
 # Импорт из модуля caricature_generator
-from feature_extraction import (
+from .feature_extraction import (
     MediaPipeFaceAggregator,
     get_canonical_groups,
     get_caricature_parameters,

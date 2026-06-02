@@ -18,5 +18,20 @@ dependencies = [
     "qwen-vl-utils==0.0.14",
     "testcv2==0.0.1",
     "tqdm==4.67.3",
-    "transformers==5.9.0",
+    "transformers>=4.49.0",
+    "tokenizers>=0.21.0",
+    "torch>=2.5.0",
+    "torchvision>=0.20.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
 ]
+
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
