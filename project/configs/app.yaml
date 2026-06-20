@@ -1,0 +1,27 @@
+# Параметры веб-сервиса
+server:
+  host: "${APP_HOST:0.0.0.0}"
+  port: "${APP_PORT:8000}"
+  workers: "${APP_WORKERS:1}"
+  reload: "${APP_RELOAD:false}"
+  log_level: "${APP_LOG_LEVEL:info}"
+
+cors:
+  origins: "${CORS_ORIGINS:http://localhost:3000}"
+  allow_methods: ["GET", "POST"]
+  allow_headers: ["*"]
+
+upload:
+  # Максимальный размер загружаемого файла (байты)
+  max_file_size: 10_485_760   # 10 MB
+  allowed_extensions: [".jpg", ".jpeg", ".png", ".webp"]
+  # Папка для временных загрузок
+  temp_dir: "/tmp/caricature_uploads"
+
+output:
+  # Сколько последних результатов хранить на диске
+  max_results_stored: 1000
+  # Формат сохранения шаржей
+  save_format: "png"
+  # Качество JPEG если save_format = "jpeg"
+  jpeg_quality: 95

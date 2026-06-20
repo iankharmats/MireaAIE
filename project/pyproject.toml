@@ -18,12 +18,13 @@ dependencies = [
     "qwen-vl-utils==0.0.14",
     "testcv2==0.0.1",
     "tqdm==4.67.3",
-    "transformers>=4.49.0",
-    "tokenizers>=0.21.0",
+    "transformers==4.48.3",
+    "tokenizers==0.21.0",
     "torch>=2.5.0",
     "torchvision>=0.20.0",
     "uvicorn[standard]>=0.30.0",
     "python-multipart>=0.0.9",
+    "pydantic-settings==2.14.2",
 ]
 
 

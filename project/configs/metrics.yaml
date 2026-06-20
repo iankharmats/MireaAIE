@@ -1,0 +1,50 @@
+# Пороги для метрик оценки качества
+
+evaluation:
+  # Сколько изображений брать для оценки
+  n_images: 10
+  shuffle: true
+  sample_seed: 42
+  # Seed'ы для генерации при оценке
+  gen_seeds: [67, 999, 1234]
+
+thresholds:
+  identity:
+    # Минимальный FaceID cosine similarity
+    min_faceid_similarity: 0.3
+
+  warp:
+    # Минимальное пиксельное отличие варпа
+    min_warp_diff: 5.0
+
+  artifacts:
+    # Ниже = размыто
+    blur_thresh: 50.0
+    # Выше = шумно
+    noise_thresh: 8.0
+    # % пикселей > 250
+    overexp_thresh: 5.0
+    # % пикселей < 5
+    underexp_thresh: 5.0
+    # Блочность (JPEG-артефакты)
+    blockiness_thresh: 0.15
+    # Диапазон нормальной энтропии
+    entropy_lo: 5.0
+    entropy_hi: 9.0
+    # Цветовое смещение (Hellinger dist)
+    color_shift_thresh: 0.4
+    # Минимальная насыщенность
+    saturation_lo: 20.0
+
+  clip:
+    # Оптимальный диапазон CLIP similarity для шаржа
+    sim_lo: 0.60
+    sim_hi: 0.85
+
+  fid:
+    good_threshold: 50.0
+    acceptable_threshold: 150.0
+
+  kid:
+    good_threshold: 0.05
+    acceptable_threshold: 0.25

@@ -1,332 +1,269 @@
+"""
+api.py
+FastAPI сервис генерации шаржей.
+Все параметры конфигурации из get_config().
+"""
+
 from __future__ import annotations
 
-from time import perf_counter
 import io
-import cv2
-import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile, Form
-from fastapi.responses import StreamingResponse, Response
-from pydantic import BaseModel, Field
-from typing import Any, Optional
-from datetime import datetime
-import uuid
 import json
 import os
+import uuid
+from datetime import datetime
+from time import perf_counter
+from typing import Any, Optional
 
+import cv2
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, Response
+
+from .config import get_config
 from .feature_extraction import warp_image
 from .caricature_generator import CaricatureGenerator
 from .metrics import evaluate
 
-# --------------- Поля сбора статистики --------------
-total_req = 0
-latency_ct = 0
-total_latency_ms = 0
+cfg = get_config()
+
+# Счётчики статистики сервера
+total_req         = 0
+latency_ct        = 0
+total_latency_ms  = 0.0
 last_caricature_metrics = {
-    "timestamp": None,
+    "timestamp":  None,
     "request_id": None,
-    "metrics": None
+    "metrics":    None,
 }
 
-# --------------- FastAPI ---------------
-
 app = FastAPI(
-    title="AIE Caricature Generation Service API",
-    version="0.2.0",
-    description=(
+    title       = "AIE Caricature Generation Service API",
+    version     = "0.2.0",
+    description = (
         "HTTP-сервис генерации карикатур. "
         "Основывается на Stable Diffusion и оценке VLLM-критиком"
     ),
-    docs_url="/docs",
-    redoc_url=None,
+    docs_url  = "/docs",
+    redoc_url = None,
 )
 
-# --------------- Предварительная конфигурация --------------
-CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(CURRENT_FILE_DIR)
-MEAN_FACE_PATH = os.path.join(PROJECT_ROOT, "configs", "mean_face.json")
+# CORS из конфига
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins     = cfg.app.cors_origins_list,
+    allow_methods     = cfg.app_yaml["cors"]["allow_methods"],
+    allow_headers     = cfg.app_yaml["cors"]["allow_headers"],
+    allow_credentials = True,
+)
 
-# Инициализируем генератор ОДИН раз при старте сервера
+# Инициализируем генератор один раз при старте — все параметры из конфига
 print("⏳ Загрузка весов SD 1.5, ControlNet и Qwen2-VL в видеопамять...")
-generator = CaricatureGenerator(
-    checkpoint_dir = os.path.join(PROJECT_ROOT, "notebooks/dpo_checkpoints/cycle_01"),
-    mean_face_path = MEAN_FACE_PATH,
-    judge_device   = "cuda",  # Судья на отдельной карте
-)
+generator = CaricatureGenerator()
 print("🚀 Все модели успешно загружены и готовы к инференсу!")
 
-# --------------- Логирование ---------------
+LOG_DIR      = "logs"
+LOG_FILENAME = "api.log"
 
-LOG_DIR = 'logs'
-LOG_FILENAME = 'api.log'
 
 class RequestLogger:
-    """Реализация логгера"""
-    
+    """Логгер запросов в JSON-файл."""
+
     @staticmethod
     def log_request(
-        endpoint: str,
-        status: int,
+        endpoint:   str,
+        status:     int,
         latency_ms: Optional[float] = None,
-        request_id: Optional[str] = None
+        request_id: Optional[str]   = None,
     ) -> None:
-        """Статический метод логирования запроса"""
-        
         log_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "endpoint": endpoint,
-            "status": status,
+            "timestamp":  datetime.now().isoformat(),
+            "endpoint":   endpoint,
+            "status":     status,
             "latency_ms": latency_ms,
-            "request_id": request_id or str(uuid.uuid4())
+            "request_id": request_id or str(uuid.uuid4()),
         }
-        
-        log_entry = {k: v for k, v in log_entry.items() if v is not None}
-
-        global LOG_DIR, LOG_FILENAME 
+        log_entry     = {k: v for k, v in log_entry.items() if v is not None}
         full_log_path = os.path.join(LOG_DIR, LOG_FILENAME)
-        
-        # Создаем папку logs, если её нет
-        os.makedirs(LOG_DIR, exist_ok=True) 
-        
-        # Проверяем существование файла по пути full_log_path
+        os.makedirs(LOG_DIR, exist_ok=True)
         if not os.path.exists(full_log_path):
-            open(full_log_path, "w", encoding='utf-8').close()
+            open(full_log_path, "w", encoding="utf-8").close()
 
-        json_str = f'{json.dumps(log_entry, ensure_ascii=False)}\n'
-        print(json_str)
+        line = f"{json.dumps(log_entry, ensure_ascii=False)}\n"
+        print(line)
+        with open(full_log_path, "a", encoding="utf-8") as f:
+            f.write(line)
 
-        with open(full_log_path, 'a', encoding='utf-8') as f:
-            f.write(json_str)
-
-
-# ---------- Системные эндпоинты ----------
 
 @app.get("/health", tags=["system"], summary="Health-check сервиса")
 def health() -> dict[str, str]:
     global total_req
     total_req += 1
-    return {
-        "status": "ok",
-        "service": "caricature-generation",
-        "version": "0.1.0",
-    }
+    return {"status": "ok", "service": "caricature-generation", "version": "0.2.0"}
 
 
-@app.get("/metrics", tags=["system"], summary="Статистика по работе сервера и метрики последнего шаржа.")
+@app.get("/metrics", tags=["system"], summary="Статистика сервера и метрики последнего шаржа")
 def metrics() -> dict[str, Any]:
     global total_latency_ms, latency_ct, total_req, last_caricature_metrics
-    try: 
-        avg_latency_ms = total_latency_ms / latency_ct
-    except ZeroDivisionError:
-        avg_latency_ms = None
-        
+    avg = total_latency_ms / latency_ct if latency_ct else None
     return {
-        "total_req": total_req,
-        "avg_latency_ms": avg_latency_ms,
+        "total_req":      total_req,
+        "avg_latency_ms": avg,
         "last_caricature_evaluation": {
-            "timestamp": last_caricature_metrics["timestamp"],
+            "timestamp":  last_caricature_metrics["timestamp"],
             "request_id": last_caricature_metrics["request_id"],
-            "data": last_caricature_metrics["metrics"]
-        }
+            "data":       last_caricature_metrics["metrics"],
+        },
     }
 
-
-# ---------- Основные эндпоинты ----------
 
 @app.post(
-    "/generate", 
-    tags=["main"], 
+    "/generate",
+    tags=["main"],
     summary="Генерация карикатуры на основе RLAIF-пайплайна",
-    response_class=StreamingResponse, 
+    response_class=StreamingResponse,
     responses={
         200: {
-            "description": "Успешная генерация. Возвращает лучший шарж (выбор Qwen2-VL) в формате PNG.",
-            "content": {
-                "image/png": {  
-                    "schema": {
-                        "type": "string",
-                        "format": "binary"  
-                    }
-                }
-            }
+            "description": "Лучший шарж (выбор Qwen2-VL) в формате PNG.",
+            "content": {"image/png": {"schema": {"type": "string", "format": "binary"}}},
         },
-        400: {
-            "description": "Ошибка валидации (загружен не графический файл)"
-        },
-        500: {
-            "description": "Внутренняя ошибка генерации, сбой диффузии или критика"
-        }
-    }
+        400: {"description": "Загружен не графический файл"},
+        500: {"description": "Внутренняя ошибка генерации"},
+    },
 )
 async def caricature_generation(
-    file: UploadFile = File(..., description="Выбрать изображение лица для генерации шаржа"),
-    strength: float = Form(
-        default=1.5, 
-        ge=0.0, 
-        le=3.0, 
-        description="Сила утрирования черт"
-    )
+    file: UploadFile = File(..., description="Изображение лица для генерации шаржа"),
+    strength: float  = Form(
+        default=cfg.warp_strength, ge=0.0, le=3.0,
+        description="Сила утрирования черт",
+    ),
 ):
     """
-    Эндпоинт принимает фото, сохраняет его во временный файл, передает в пайплайн 
-    ControlNet+SD 1.5, прогоняет через критика Qwen2-VL, рассчитывает технические 
-    метрики сходства/качества и возвращает лучшую карикатуру.
+    Принимает фото, прогоняет через ControlNet+SD 1.5, оценивает Qwen2-VL,
+    считает CLIP+Artifact метрики и возвращает лучший вариант шаржа.
     """
-    global total_req
-    total_req += 1
-    request_id = str(uuid.uuid4())
-
-    start = perf_counter()
+    global total_req, last_caricature_metrics, total_latency_ms, latency_ct
+    total_req  += 1
+    request_id  = str(uuid.uuid4())
+    start       = perf_counter()
 
     if not file.content_type.startswith("image/"):
-        RequestLogger.log_request(endpoint="/generate", status=400, request_id=request_id)
+        RequestLogger.log_request("/generate", 400, request_id=request_id)
         raise HTTPException(status_code=400, detail="Загруженный файл не является изображением.")
 
-    temp_input_path = f"temp_gen_{request_id}.jpg"
-    temp_output_path = f"temp_out_{request_id}.png"
-    
+    temp_in  = f"temp_gen_{request_id}.jpg"
+    temp_out = f"temp_out_{request_id}.png"
+
     try:
-        # Сохраняем входящий поток байт во временный файл для генератора
         contents = await file.read()
-        with open(temp_input_path, "wb") as f:
+        with open(temp_in, "wb") as f:
             f.write(contents)
-            
-        result = generator.generate(temp_input_path, warp_strength=strength)
-        
-        print(f"\n[Request {request_id}] Ранжирование вариантов: {' > '.join(result['ranking'])}")
-        print(f"[Request {request_id}] Вердикт Qwen2-VL:\n{result['judge_response']}\n")
-        
-        best_img = result["best"]
-        
-        # Сохраняем во временный файл на диске, чтобы скормить модулю caricature_metrics
-        best_img.save(temp_output_path, format="PNG")
-        
-        # Считаем CLIP и Artifacts для конкретного кадра на доступной GPU (например, cuda:3)
+
+        result = generator.generate(temp_in, warp_strength=strength)
+
+        print(f"\n[{request_id}] Ранжирование: {' > '.join(result['ranking'])}")
+        print(f"[{request_id}] Вердикт:\n{result['judge_response']}\n")
+
+        result["best"].save(temp_out, format="PNG")
+
+        # FID/KID отключены — поштучный инференс, пороги артефактов из конфига
         metrics_score = evaluate(
-            original=temp_input_path,
-            caricature=temp_output_path,
-            device="cuda",
-            compute_fid=False,       # Отключаем FID для поштучного инференса
-            compute_kid=False,       # Отключаем KID для поштучного инференса
-            compute_clip=True,
-            compute_artifacts=True
+            original          = temp_in,
+            caricature        = temp_out,
+            device            = cfg.app.metrics_device,
+            compute_fid       = False,
+            compute_kid       = False,
+            compute_clip      = True,
+            compute_artifacts = True,
         )
-        
-        # Обновляем глобальное состояние для эндпоинта /metrics
-        global last_caricature_metrics
-        last_caricature_metrics["timestamp"] = datetime.now().isoformat()
-        last_caricature_metrics["request_id"] = request_id
-        last_caricature_metrics["metrics"] = metrics_score
-        
-        # Переводим сохраненную картинку обратно в IO буфер для StreamingResponse
-        with open(temp_output_path, "rb") as img_f:
+
+        last_caricature_metrics.update({
+            "timestamp":  datetime.now().isoformat(),
+            "request_id": request_id,
+            "metrics":    metrics_score,
+        })
+
+        with open(temp_out, "rb") as img_f:
             io_buf = io.BytesIO(img_f.read())
         io_buf.seek(0)
-        
         status_code = 200
 
     except Exception as e:
-        status_code = 500
-        RequestLogger.log_request(endpoint="/generate", status=500, request_id=request_id)
-        raise HTTPException(status_code=500, detail=f"Ошибка пайплайна генерации: {str(e)}")
-        
-    finally:
-        if os.path.exists(temp_input_path):
-            os.remove(temp_input_path)
-        if os.path.exists(temp_output_path):
-            os.remove(temp_output_path)
+        RequestLogger.log_request("/generate", 500, request_id=request_id)
+        raise HTTPException(status_code=500, detail=f"Ошибка пайплайна генерации: {e}")
 
-    global total_latency_ms, latency_ct
-    latency_ms = (perf_counter() - start) * 1000.0
-    latency_ct += 1
+    finally:
+        for p in (temp_in, temp_out):
+            if os.path.exists(p):
+                os.remove(p)
+
+    latency_ms       = (perf_counter() - start) * 1000.0
+    latency_ct      += 1
     total_latency_ms += latency_ms
 
-    RequestLogger.log_request(
-        endpoint="/generate",
-        status=status_code,
-        latency_ms=latency_ms,
-        request_id=request_id
-    )
-
+    RequestLogger.log_request("/generate", status_code, latency_ms, request_id)
     return StreamingResponse(io_buf, media_type="image/png")
 
 
 @app.post(
-    "/warp", tags=["main"], summary="Warp-деформация загруженного изображения.",
-    response_class=StreamingResponse, 
+    "/warp",
+    tags=["main"],
+    summary="Warp-деформация загруженного изображения",
+    response_class=StreamingResponse,
     responses={
         200: {
-            "description": "Успешное выполнение варпинга. Возвращает измененный PNG-файл.",
-            "content": {
-                "image/png": {  
-                    "schema": {
-                        "type": "string",
-                        "format": "binary"  
-                    }
-                }
-            }
+            "description": "Деформированный PNG.",
+            "content": {"image/png": {"schema": {"type": "string", "format": "binary"}}},
         },
-        400: {
-            "description": "Ошибка валидации входных данных (например, загружен не графический файл)"
-        },
-        500: {
-            "description": "Внутренняя ошибка пайплайна или сбой MediaPipe"
-        }
-    }
+        400: {"description": "Не графический файл"},
+        500: {"description": "Ошибка пайплайна или сбой MediaPipe"},
+    },
 )
 async def warp(
-    file: UploadFile = File(..., description="Выбрать изображение лица для варпинга"),
-    strength: float = Form(
-        default=1.5, 
-        ge=0.0, 
-        le=3.0, 
-        description="Сила утрирования черт"
-    )
+    file: UploadFile = File(..., description="Изображение лица для варпинга"),
+    strength: float  = Form(
+        default=cfg.warp_strength, ge=0.0, le=3.0,
+        description="Сила утрирования черт",
+    ),
 ) -> Response:
-    global total_req
-    total_req += 1
-    request_id = str(uuid.uuid4())
-
-    start = perf_counter()
+    global total_req, total_latency_ms, latency_ct
+    total_req  += 1
+    request_id  = str(uuid.uuid4())
+    start       = perf_counter()
 
     if not file.content_type.startswith("image/"):
-        RequestLogger.log_request(endpoint="/warp", status=400, request_id=request_id)
+        RequestLogger.log_request("/warp", 400, request_id=request_id)
         raise HTTPException(status_code=400, detail="Загруженный файл не является изображением.")
 
-    temp_input_path = f"temp_input_{request_id}.jpg"
+    temp_in = f"temp_input_{request_id}.jpg"
     try:
         contents = await file.read()
+        print(f"[/warp] прочитано байт: {len(contents)}")
         
-        with open(temp_input_path, "wb") as f:
+        with open(temp_in, "wb") as f:
             f.write(contents)
-            
-        warped_img_bgr = warp_image(temp_input_path, strength)
-        
-        if os.path.exists(temp_input_path):
-            os.remove(temp_input_path)
-            
-        _, encoded_img = cv2.imencode(".png", warped_img_bgr)
-        io_buf = io.BytesIO(encoded_img.tobytes())
-        
+            f.flush()
+            os.fsync(f.fileno())
+
+        print(f"[/warp] файл записан: {temp_in}")
+        print(f"[/warp] файл существует: {os.path.exists(temp_in)}")
+        print(f"[/warp] размер на диске: {os.path.getsize(temp_in)} байт")
+
+        warped_bgr = warp_image(temp_in, strength)
+        _, enc      = cv2.imencode(".png", warped_bgr)
+        io_buf      = io.BytesIO(enc.tobytes())
         status_code = 200
 
     except Exception as e:
-        if os.path.exists(temp_input_path):
-            os.remove(temp_input_path)
+        RequestLogger.log_request("/warp", 500, request_id=request_id)
+        raise HTTPException(status_code=500, detail=f"Ошибка обработки изображения: {e}")
 
-        status_code = 500
-        RequestLogger.log_request(endpoint="/warp", status=500, request_id=request_id)
-        raise HTTPException(status_code=500, detail=f"Ошибка обработки изображения: {str(e)}")
+    finally:
+        if os.path.exists(temp_in):
+            os.remove(temp_in)
 
-    global total_latency_ms, latency_ct
-    latency_ms = (perf_counter() - start) * 1000.0
-    latency_ct += 1
+    latency_ms       = (perf_counter() - start) * 1000.0
+    latency_ct      += 1
     total_latency_ms += latency_ms
 
-    RequestLogger.log_request(
-        endpoint="/warp",
-        status=status_code,
-        latency_ms=latency_ms,
-        request_id=request_id
-    )
-
+    RequestLogger.log_request("/warp", status_code, latency_ms, request_id)
     return StreamingResponse(io_buf, media_type="image/png")

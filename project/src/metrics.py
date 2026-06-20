@@ -31,13 +31,28 @@ from skimage.metrics import structural_similarity as ssim_fn
 
 warnings.filterwarnings("ignore")
 
-# ── Тип входа: путь или PIL ───────────────────────────────────────────
+# Тип входа: путь или PIL -------
 ImageInput = Union[str, Path, Image.Image]
 
 
-# ════════════════════════════════════════════════════════════════════════
+# Пороги из конфига 
+try:
+    from .config import get_config as _get_cfg
+    _t = _get_cfg().metrics["thresholds"]
+    _FID_GOOD        = float(_t["fid"]["good_threshold"])
+    _FID_ACCEPTABLE  = float(_t["fid"]["acceptable_threshold"])
+    _KID_GOOD        = float(_t["kid"]["good_threshold"])
+    _KID_ACCEPTABLE  = float(_t["kid"]["acceptable_threshold"])
+    _CLIP_LO         = float(_t["clip"]["sim_lo"])
+    _CLIP_HI         = float(_t["clip"]["sim_hi"])
+    _ART_THRESHOLDS  = {k: float(v) for k, v in _t["artifacts"].items()}
+except Exception:
+    _FID_GOOD, _FID_ACCEPTABLE = 50.0, 150.0
+    _KID_GOOD, _KID_ACCEPTABLE = 0.05, 0.15
+    _CLIP_LO, _CLIP_HI         = 0.60, 0.85
+    _ART_THRESHOLDS            = {}
+
 #  Утилиты загрузки
-# ════════════════════════════════════════════════════════════════════════
 
 def _to_pil(img: ImageInput, size: Optional[int] = None) -> Image.Image:
     """Конвертирует любой входной тип в PIL RGB."""
@@ -70,9 +85,7 @@ def _to_tensor(pil: Image.Image, device: str = "cpu",
     return t
 
 
-# ════════════════════════════════════════════════════════════════════════
 #  Inception V3 — общий экземпляр (ленивая загрузка)
-# ════════════════════════════════════════════════════════════════════════
 
 _inception_model = None
 
@@ -114,9 +127,7 @@ def _inception_features(
     return np.concatenate(feats, axis=0)   # (N, 2048)
 
 
-# ════════════════════════════════════════════════════════════════════════
 #  CLIP — общий экземпляр (ленивая загрузка)
-# ════════════════════════════════════════════════════════════════════════
 
 _clip_model     = None
 _clip_processor = None
@@ -151,9 +162,9 @@ def _clip_image_embedding(pil: Image.Image, device: str) -> np.ndarray:
     return emb.cpu().numpy().squeeze()   # (512,)
 
 
-# ════════════════════════════════════════════════════════════════════════
+# 
 #  FID
-# ════════════════════════════════════════════════════════════════════════
+# 
 
 def _fid_from_features(
     feats_real : np.ndarray,   # (N, D)
@@ -187,9 +198,9 @@ def _fid_from_features(
     return float(np.real(fid))
 
 
-# ════════════════════════════════════════════════════════════════════════
+# 
 #  KID
-# ════════════════════════════════════════════════════════════════════════
+# 
 
 def _polynomial_kernel(
     X : np.ndarray,   # (N, D)
@@ -240,9 +251,9 @@ def _kid_from_features(
     return float(kid)
 
 
-# ════════════════════════════════════════════════════════════════════════
+# 
 #  CLIP Similarity
-# ════════════════════════════════════════════════════════════════════════
+# 
 
 def compute_clip_similarity(
     orig   : ImageInput,
@@ -260,9 +271,9 @@ def compute_clip_similarity(
     return float(np.clip(sim, 0.0, 1.0))
 
 
-# ════════════════════════════════════════════════════════════════════════
+# 
 #  Метрики артефактов
-# ════════════════════════════════════════════════════════════════════════
+# 
 
 def _sharpness(pil: Image.Image, size: int = 256) -> float:
     """
@@ -386,8 +397,9 @@ def compute_artifact_metrics(
         "color_shift_thresh": 0.4,
         "saturation_lo"    : 20.0,
     }
+    cfg.update(_ART_THRESHOLDS)   # перекрываем значениями из metrics.yaml
     if config:
-        cfg.update(config)
+        cfg.update(config)        # пользовательский override остаётся
 
     caric_pil = _to_pil(caric, size=None)
     orig_pil  = _to_pil(orig,  size=None) if orig is not None else None
@@ -425,9 +437,7 @@ def compute_artifact_metrics(
     }
 
 
-# ════════════════════════════════════════════════════════════════════════
 #  Главная функция
-# ════════════════════════════════════════════════════════════════════════
 
 def evaluate(
     original       : ImageInput,
@@ -470,7 +480,7 @@ def evaluate(
     real_pils = [orig_pil]  + ([_to_pil(x) for x in extra_real] if extra_real else [])
     fake_pils = [caric_pil] + ([_to_pil(x) for x in extra_fake] if extra_fake else [])
 
-    # ── FID ──────────────────────────────────────────────────────────
+    # FID ----------------------------------------------------------
     if compute_fid or compute_kid:
         print("🔢 Извлечение Inception признаков...")
         feats_real = _inception_features(real_pils, device)
@@ -491,7 +501,7 @@ def evaluate(
         }
         print(f"  FID  = {fid_val:.4f}  {_interpret_fid(fid_val)}")
 
-    # ── KID ──────────────────────────────────────────────────────────
+    # KID ----------------------------------------------------------
     if compute_kid:
         kid_val = _kid_from_features(feats_real, feats_fake)
         result["kid"] = {
@@ -507,7 +517,7 @@ def evaluate(
         }
         print(f"  KID  = {kid_val:.6f}  {_interpret_kid(kid_val)}")
 
-    # ── CLIP Similarity ───────────────────────────────────────────────
+    # CLIP Similarity -----------------------------------------------
     if compute_clip:
         print("🔢 CLIP similarity...")
         clip_val = compute_clip_similarity(orig_pil, caric_pil, device)
@@ -522,7 +532,7 @@ def evaluate(
         }
         print(f"  CLIP = {clip_val:.4f}  {_interpret_clip(clip_val)}")
 
-    # ── Артефакты ─────────────────────────────────────────────────────
+    # Артефакты -----------------------------------------------------
     if compute_artifacts:
         print("🔢 Метрики артефактов...")
         art = compute_artifact_metrics(
@@ -534,15 +544,13 @@ def evaluate(
         print(f"  Artifact score = {art['artifact_score']}/8  "
               f"flags={art['artifact_flags']}")
 
-    # ── Сводка ───────────────────────────────────────────────────────
+    # Сводка -------------------------------------------------------
     result["summary"] = _build_summary(result)
 
     return result
 
 
-# ════════════════════════════════════════════════════════════════════════
 #  Интерпретация
-# ════════════════════════════════════════════════════════════════════════
 
 def _interpret_fid(fid: float) -> str:
     if   fid < 10:   return "🟢 Отлично (очень близко к реальным)"
@@ -572,18 +580,18 @@ def _build_summary(result: Dict) -> Dict:
 
     if "fid" in result:
         total += 1
-        if result["fid"]["value"] < 150:
+        if result["fid"]["value"] < _FID_ACCEPTABLE:
             score += 1
 
     if "kid" in result:
         total += 1
-        if result["kid"]["value"] < 0.15:
+        if result["kid"]["value"] < _KID_ACCEPTABLE:
             score += 1
 
     if "clip" in result:
         total += 1
         v = result["clip"]["value"]
-        if 0.40 <= v <= 0.85:
+        if _CLIP_LO * 0.65 <= v <= _CLIP_HI:
             score += 1
 
     if "artifacts" in result:
@@ -591,24 +599,15 @@ def _build_summary(result: Dict) -> Dict:
         if result["artifacts"]["artifact_score"] <= 2:
             score += 1
 
-    grades = {
-        4: "🏆 Отлично",
-        3: "🟢 Хорошо",
-        2: "🟡 Приемлемо",
-        1: "🔴 Плохо",
-        0: "💀 Критично",
-    }
+    grades = {4: "🏆 Отлично", 3: "🟢 Хорошо", 2: "🟡 Приемлемо", 1: "🔴 Плохо", 0: "💀 Критично"}
     return {
-        "score"           : score,
-        "total"           : total,
-        "grade"           : grades.get(score, "❓"),
+        "score":            score,
+        "total":            total,
+        "grade":            grades.get(score, "❓"),
         "metrics_computed": list(result.keys()),
     }
 
-
-# ════════════════════════════════════════════════════════════════════════
 #  Батчевая оценка нескольких пар
-# ════════════════════════════════════════════════════════════════════════
 
 def evaluate_batch(
     pairs          : List[Tuple[ImageInput, ImageInput]],
@@ -699,9 +698,7 @@ def evaluate_batch(
     return result
 
 
-# ════════════════════════════════════════════════════════════════════════
 #  Визуализация таблицы
-# ════════════════════════════════════════════════════════════════════════
 
 def plot_metrics_table(
     result    : Dict,
@@ -748,9 +745,9 @@ def plot_metrics_table(
         rows.append([name, v_str, optimum_str, interp])
         row_clrs.append([clr] * 4)
 
-    # ── Секция FID ────────────────────────────────────────────────────
+    # Секция FID ----------------------------------------------------
     if "fid" in result:
-        rows.append(["── FID ──────────────────", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
+        rows.append(["-- FID ------------------", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
         _add("FID ↓",
              result["fid"]["value"], 0, 150,
              "< 150 (< 50 отлично)", fmt=".2f")
@@ -759,24 +756,24 @@ def plot_metrics_table(
                      "≥ 50 для надёжности", ""])
         row_clrs.append(["#f8f9fa"]*4)
 
-    # ── Секция KID ────────────────────────────────────────────────────
+    # Секция KID ----------------------------------------------------
     if "kid" in result:
-        rows.append(["── KID ──────────────────", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
+        rows.append(["-- KID ------------------", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
         _add("KID ↓",
              result["kid"]["value"], 0, 0.15,
              "< 0.15 (< 0.05 отлично)", invert=True, fmt=".6f")
 
-    # ── Секция CLIP ───────────────────────────────────────────────────
+    # Секция CLIP ---------------------------------------------------
     if "clip" in result:
-        rows.append(["── CLIP ─────────────────", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
+        rows.append(["-- CLIP -----------------", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
         _add("CLIP Similarity ↕",
              result["clip"]["value"], 0.60, 0.85,
              "0.60–0.85 (шарж узнаваем)")
 
-    # ── Секция Артефакты ──────────────────────────────────────────────
+    # Секция Артефакты ----------------------------------------------
     if "artifacts" in result:
         art = result["artifacts"]
-        rows.append(["── АРТЕФАКТЫ ────────────", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
+        rows.append(["-- АРТЕФАКТЫ ------------", "", "", ""]); row_clrs.append(["#e9ecef"]*4)
 
         _add("Artifact Score ↓", art["artifact_score"],    0,  2,  "≤ 2/8", invert=True, fmt="d")
         _add("Sharpness ↑",      art["sharpness"],         50, 400,"50–400",  fmt=".1f")
@@ -793,17 +790,17 @@ def plot_metrics_table(
                          ", ".join(art["artifact_flags"]), "", "⚠️"])
             row_clrs.append(["#fff3cd"]*4)
 
-    # ── Итог ─────────────────────────────────────────────────────────
+    # Итог ---------------------------------------------------------
     if "summary" in result:
         s = result["summary"]
-        rows.append(["── ИТОГ ─────────────────", "", "", ""]); row_clrs.append(["#343a40"]*4)
+        rows.append(["-- ИТОГ -----------------", "", "", ""]); row_clrs.append(["#343a40"]*4)
         rows.append(["Балл", f"{s['score']}/{s['total']}", "", s["grade"]])
         clr = {"🏆":"#d4edda","🟢":"#d4edda","🟡":"#fff3cd","🔴":"#f8d7da"}.get(
             s["grade"][0], "#ffffff"
         )
         row_clrs.append([clr]*4)
 
-    # ── Рисуем ───────────────────────────────────────────────────────
+    # Рисуем -------------------------------------------------------
     show_images = orig is not None and caric is not None
     fig_h = max(6, len(rows) * 0.38 + 2)
     if show_images:
@@ -846,7 +843,7 @@ def plot_metrics_table(
 
     # Заголовки секций — серый фон, жирный текст
     for i, row in enumerate(rows):
-        if row[0].startswith("──"):
+        if row[0].startswith("--"):
             for j in range(4):
                 cell = tbl[(i + 1, j)]
                 cell.set_facecolor("#e9ecef")

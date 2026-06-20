@@ -1,0 +1,67 @@
+# Гиперпараметры генерации шаржей
+
+warp:
+  # Сила деформации лица (1.0 - слабо, 3.0 - сильно)
+  strength: 2.0
+  # Плавность затухания деформации
+  sigma_factor: 0.35
+  # Шаг прореживания сетки (1 = плавно, 4 = быстро)
+  grid_step: 1
+  # Стабилизация фона по периметру
+  background_stabilization: true
+
+diffusion:
+  # Размер кропа лица для генерации
+  crop_size: 512
+  # Сила шума (0.0 = без изменений, 1.0 = полная генерация)
+  denoise_strength: 0.85
+  # Сила следования промпту
+  guidance_scale: 9.0
+  # Количество шагов диффузии
+  num_steps: 35
+  # Seed'ы для генерации вариантов
+  seeds: [67, 999, 42]
+
+controlnet:
+  # Сила влияния ControlNet
+  weight: 0.6
+  # На каком шаге начинает работать
+  start: 0.0
+  # На каком шаге перестаёт работать
+  end: 0.65
+  # Пороги детектора Canny
+  canny_lo: 60
+  canny_hi: 150
+
+ip_adapter:
+  # Сила влияния FaceID на генерацию
+  scale: 0.35
+  # Масштаб LoRA весов
+  lora_scale: 0.4
+
+prompt:
+  # Сколько топ-отклонений использовать для промпта
+  top_k: 5
+  # Порог значимого отклонения (%)
+  deviation_threshold: 10.0
+  # Художественный стиль по умолчанию
+  # Варианты: hyperrealism | 3d_pixar | digital_art
+  art_style: "hyperrealism"
+  # Пол персонажа по умолчанию
+  gender: "human"
+
+  negative_prompt: >
+    normal proportions, regular anatomy, symmetrical face,
+    3D render, anime, cartoon, illustration, drawing, painting,
+    bad anatomy, smooth skin, plastic skin, blurry,
+    low resolution, watermark
+
+judge:
+  # Модель для оценки вариантов
+  model_id: "Qwen/Qwen2-VL-7B-Instruct"
+  # Максимум токенов в ответе судьи
+  max_new_tokens: 512
+  # Минимальный размер изображения для судьи
+  min_pixels: 200704    # 256 * 28 * 28
+  # Максимальный размер изображения для судьи
+  max_pixels: 401408    # 512 * 28 * 28

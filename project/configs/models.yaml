@@ -1,0 +1,39 @@
+# Пути к моделям и настройки устройств
+
+devices:
+  generation: "cuda:${GENERATION_GPU:0}"
+  judge:      "cuda:${JUDGE_GPU:1}"
+  metrics:    "cuda:${METRICS_GPU:2}"
+
+paths:
+  # MediaPipe Face Landmarker
+  face_landmarker: "artifacts/pretrained_models/face_landmarker.task"
+  # URL для автоскачивания если файл не найден
+  face_landmarker_url: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+  # Статистика среднего лица датасета
+  mean_face: "${MEAN_FACE_PATH:configs/mean_face.json}"
+
+  # Дообученный чекпоинт (пусто = базовая модель)
+  checkpoint: "${CHECKPOINT_DIR:}"
+
+  # Выходные директории
+  output_dir:       "${OUTPUT_DIR:outputs}"
+  feature_maps_dir: "${FEATURE_MAPS_DIR:configs/controlnet/feature_maps}"
+  prompt_params_dir: "${PROMPT_PARAMS_DIR:configs/controlnet/prompt_params}"
+
+huggingface:
+  # Базовая SD модель
+  sd_base: "runwayml/stable-diffusion-v1-5"
+  # ControlNet
+  controlnet: "lllyasviel/control_v11p_sd15_canny"
+  # IP-Adapter FaceID
+  ip_adapter_repo:   "h94/IP-Adapter-FaceID"
+  ip_adapter_weight: "ip-adapter-faceid_sd15.bin"
+  ip_adapter_lora:   "ip-adapter-faceid_sd15_lora.safetensors"
+  # Судья
+  judge: "Qwen/Qwen2-VL-7B-Instruct"
+  # InsightFace
+  insightface_model: "buffalo_l"
+
+insightface:
+  det_size: 640
